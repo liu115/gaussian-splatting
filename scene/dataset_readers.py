@@ -140,6 +140,16 @@ def readScannetppInfo(rootdir):
     transforms_path = os.path.join(rootdir, "nerfstudio/transforms.json")
     images_dir = os.path.join(rootdir, "resized_images")
     points_txt_path = os.path.join(rootdir, "colmap/points3D.txt")
+    camera_extrinsic_path = os.path.join(rootdir, "colmap/images.txt")
+    camera_extrinsic = read_extrinsics_text(camera_extrinsic_path)
+
+    extrinsic_dict = {}
+    for iamge_id, image in camera_extrinsic.items():
+        filename = os.path.basename(image.name)
+        R = np.transpose(qvec2rotmat(image.qvec))
+        T = np.array(image.tvec)
+        extrinsic_dict[filename] = (R, T)
+
     ply_path = os.path.join(rootdir, "colmap/points3D.ply")
     with open(transforms_path) as f:
         transforms = json.load(f)
@@ -159,11 +169,7 @@ def readScannetppInfo(rootdir):
     test_frames = transforms["test_frames"]
     num_train_frames = len(frames)
     for idx, frame in tqdm(enumerate(frames + test_frames), desc="Loading frames", total=len(frames + test_frames)):
-        c2w = np.array(frame["transform_matrix"])
-        c2w[:3, 1:3] *= -1.0
-        w2c = np.linalg.inv(c2w)
-        R = np.transpose(w2c[:3, :3])
-        T = w2c[:3, 3]
+        R, T = extrinsic_dict[frame["file_path"]]
 
         image_path = os.path.join(images_dir, frame["file_path"])
         image_name = Path(image_path).stem
